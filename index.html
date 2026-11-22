@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>3D 한국 전통 오목 (20×20) · AI / 로컬 2인 / 온라인 2인</title>
+  <title>3D 한국 전통 오목 (20×20) · AI / 로컬 2인 / 온라인 대결 &amp; 관전</title>
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Three.js r128 -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <!-- PeerJS (WebRTC P2P Multiplayer) -->
+  <!-- PeerJS (WebRTC P2P Multiplayer & Host-Hub Spectating) -->
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <!-- Google Fonts: Jua & Noto Sans KR -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -76,7 +76,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 1rem;
+      padding: 0.9rem;
       pointer-events: auto;
     }
 
@@ -158,16 +158,30 @@
     /* Floating Emoji Animation */
     @keyframes floatEmoji {
       0% { opacity: 0; transform: translate(-50%, 0) scale(0.5); }
-      18% { opacity: 1; transform: translate(-50%, -26px) scale(1.2); }
-      80% { opacity: 1; transform: translate(-50%, -125px) scale(1.0); }
-      100% { opacity: 0; transform: translate(-50%, -165px) scale(0.85); }
+      18% { opacity: 1; transform: translate(-50%, -26px) scale(1.22); }
+      80% { opacity: 1; transform: translate(-50%, -135px) scale(1.0); }
+      100% { opacity: 0; transform: translate(-50%, -175px) scale(0.85); }
     }
 
     .floating-emoji {
       position: fixed;
       z-index: 45;
       pointer-events: none;
-      animation: floatEmoji 1.75s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+      animation: floatEmoji 1.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+
+    /* Custom Thin Scrollbar */
+    .custom-scroll::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    .custom-scroll::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 999px;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: rgba(251, 191, 36, 0.45);
+      border-radius: 999px;
     }
   </style>
 </head>
@@ -187,14 +201,14 @@
     <!-- TOP HUD BAR -->
     <header class="absolute top-0 left-0 right-0 p-2 sm:p-3 flex flex-wrap items-start justify-between gap-2 pointer-events-none">
 
-      <!-- TOP-LEFT: Black vs White Player Cards & Status -->
+      <!-- TOP-LEFT: Black vs White Player Cards & Online/Spectator Status -->
       <div class="flex flex-col gap-1.5 pointer-events-auto">
         <div class="glass-panel rounded-2xl p-1.5 sm:p-2 flex items-center gap-1.5 sm:gap-2">
           <!-- Black Player Card -->
-          <div id="black-card" class="rounded-xl px-2.5 py-1.5 border border-white/15 bg-black/35 min-w-[100px] sm:min-w-[132px] transition">
+          <div id="black-card" class="rounded-xl px-2.5 py-1.5 border border-white/15 bg-black/35 min-w-[98px] sm:min-w-[132px] transition">
             <div class="flex items-center gap-1.5">
               <span class="stone-icon-black w-4 h-4 rounded-full shrink-0"></span>
-              <span id="black-name-hud" class="text-[11px] sm:text-xs font-bold text-amber-200 truncate max-w-[68px] sm:max-w-[92px]">흑 (플레이어)</span>
+              <span id="black-name-hud" class="text-[11px] sm:text-xs font-bold text-amber-200 truncate max-w-[66px] sm:max-w-[92px]">흑 (플레이어)</span>
             </div>
             <div class="flex items-center justify-between mt-1 text-[10px] sm:text-[11px] text-amber-100/75">
               <span id="black-moves-hud" class="font-bold text-white">0수</span>
@@ -205,10 +219,10 @@
           <div class="font-display text-xs text-amber-400/80 px-0.5">VS</div>
 
           <!-- White Player Card -->
-          <div id="white-card" class="rounded-xl px-2.5 py-1.5 border border-white/15 bg-black/35 min-w-[100px] sm:min-w-[132px] transition">
+          <div id="white-card" class="rounded-xl px-2.5 py-1.5 border border-white/15 bg-black/35 min-w-[98px] sm:min-w-[132px] transition">
             <div class="flex items-center gap-1.5">
               <span class="stone-icon-white w-4 h-4 rounded-full shrink-0"></span>
-              <span id="white-name-hud" class="text-[11px] sm:text-xs font-bold text-sky-200 truncate max-w-[68px] sm:max-w-[92px]">백 (AI)</span>
+              <span id="white-name-hud" class="text-[11px] sm:text-xs font-bold text-sky-200 truncate max-w-[66px] sm:max-w-[92px]">백 (AI)</span>
             </div>
             <div class="flex items-center justify-between mt-1 text-[10px] sm:text-[11px] text-amber-100/75">
               <span id="white-moves-hud" class="font-bold text-white">0수</span>
@@ -217,7 +231,7 @@
           </div>
         </div>
 
-        <!-- Rule Badge & Online Connection Status Row -->
+        <!-- Rule Badge, Move Count & Online/Spectator Status Row -->
         <div class="flex items-center gap-1.5 flex-wrap">
           <div id="rule-badge-hud" class="glass-panel rounded-full px-2.5 py-0.5 text-[10px] sm:text-[11px] font-bold text-amber-200 border border-amber-300/35">
             📜 렌주룰 (20×20)
@@ -226,7 +240,10 @@
             총 0수
           </div>
           <div id="net-status-pill" class="hidden glass-panel rounded-full px-2.5 py-0.5 text-[10px] sm:text-[11px] font-bold text-emerald-300 border border-emerald-400/40">
-            🟢 연결됨
+            🟢 방 0000
+          </div>
+          <div id="spectator-count-pill" class="hidden glass-panel rounded-full px-2.5 py-0.5 text-[10px] sm:text-[11px] font-bold text-purple-200 border border-purple-400/40">
+            👀 0명
           </div>
           <div id="online-turn-banner" class="hidden glass-panel rounded-full px-2.5 py-0.5 text-[10px] sm:text-[11px] font-bold text-amber-200 border border-amber-300/50">
             🎯 내 차례!
@@ -276,7 +293,7 @@
       </div>
     </header>
 
-    <!-- BOTTOM-CENTER: Tap-to-Preview Confirm Bar -->
+    <!-- BOTTOM-CENTER: Tap-to-Preview Confirm Bar (Hidden for Spectators) -->
     <div id="confirm-bar" class="hidden fixed left-1/2 bottom-5 -translate-x-1/2 z-30 pointer-events-auto">
       <div class="glass-panel rounded-2xl p-2 border-2 border-emerald-400/60 flex items-center gap-2">
         <button id="confirm-place-btn" type="button"
@@ -290,14 +307,48 @@
       </div>
     </div>
 
-    <!-- BOTTOM-LEFT: Online Emoji Bar & Controls Hint -->
-    <div class="fixed bottom-3 left-3 z-20 pointer-events-none flex flex-col gap-1.5">
-      <div id="emoji-bar" class="hidden pointer-events-auto flex items-center gap-1.5">
-        <button type="button" data-emoji="👏" class="emoji-btn glass-panel w-9 h-9 sm:w-10 sm:h-10 rounded-full text-base sm:text-lg flex items-center justify-center hover:scale-110 active:scale-90 transition cursor-pointer">👏</button>
-        <button type="button" data-emoji="🔥" class="emoji-btn glass-panel w-9 h-9 sm:w-10 sm:h-10 rounded-full text-base sm:text-lg flex items-center justify-center hover:scale-110 active:scale-90 transition cursor-pointer">🔥</button>
-        <button type="button" data-emoji="😂" class="emoji-btn glass-panel w-9 h-9 sm:w-10 sm:h-10 rounded-full text-base sm:text-lg flex items-center justify-center hover:scale-110 active:scale-90 transition cursor-pointer">😂</button>
-        <button type="button" data-emoji="😱" class="emoji-btn glass-panel w-9 h-9 sm:w-10 sm:h-10 rounded-full text-base sm:text-lg flex items-center justify-center hover:scale-110 active:scale-90 transition cursor-pointer">😱</button>
+    <!-- BOTTOM-LEFT: Online Real-Time Chat Panel + 5 Emoji Bar + Controls Hint -->
+    <div class="fixed bottom-3 left-2.5 sm:left-3.5 z-20 pointer-events-none flex flex-col items-start gap-1.5 max-w-[calc(100vw-20px)] sm:max-w-[330px]">
+
+      <!-- Collapsible Online Real-Time Chat Panel -->
+      <div id="chat-wrapper" class="hidden pointer-events-auto w-[260px] sm:w-[305px] flex flex-col gap-1.5">
+        <div id="chat-box" class="glass-panel rounded-2xl border border-amber-300/30 overflow-hidden flex flex-col">
+          <div class="flex items-center justify-between px-3 py-1.5 bg-black/35 border-b border-white/10">
+            <span class="text-[11px] font-bold text-amber-200">💬 실시간 채팅</span>
+            <button id="chat-minimize-btn" type="button" class="text-[11px] text-amber-100/70 hover:text-white px-1 cursor-pointer">접기 ▾</button>
+          </div>
+          <div id="chat-messages" class="h-[118px] sm:h-[144px] overflow-y-auto custom-scroll px-2.5 py-2 space-y-1 text-[11px] sm:text-xs leading-snug">
+            <div class="text-amber-100/50 text-center py-4">응원 메시지나 대국 소감을 남겨보세요!</div>
+          </div>
+          <div class="flex items-center gap-1 p-1.5 bg-black/35 border-t border-white/10">
+            <input id="chat-input" type="text" maxlength="60" placeholder="메시지 입력..."
+              class="flex-1 min-w-0 px-2.5 py-1.5 rounded-xl bg-stone-950/85 border border-white/15 text-white text-xs focus:outline-none focus:border-amber-400" />
+            <button id="chat-send-btn" type="button"
+              class="px-2.5 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-stone-950 font-bold text-xs shrink-0 cursor-pointer transition">
+              전송
+            </button>
+          </div>
+        </div>
+
+        <!-- Collapsed Chat Toggle Button with Unread Badge -->
+        <div class="flex items-center gap-1.5">
+          <button id="chat-toggle-btn" type="button"
+            class="hidden glass-panel rounded-full px-3 py-1.5 border border-amber-300/40 text-xs font-bold text-amber-200 hover:bg-white/15 flex items-center gap-1.5 cursor-pointer transition">
+            <span>💬 채팅</span>
+            <span id="chat-unread-badge" class="hidden px-1.5 py-0.5 rounded-full bg-rose-500 text-white text-[10px] font-black leading-none">0</span>
+          </button>
+        </div>
       </div>
+
+      <!-- 5 Emoji Reactions Bar (👏 🔥 😂 😱 🎉) -->
+      <div id="emoji-bar" class="hidden pointer-events-auto flex items-center gap-1 sm:gap-1.5">
+        <button type="button" data-emoji="👏" class="emoji-btn glass-panel w-8 h-8 sm:w-9 sm:h-9 rounded-full text-sm sm:text-base flex items-center justify-center hover:scale-110 active:scale-90 transition cursor-pointer">👏</button>
+        <button type="button" data-emoji="🔥" class="emoji-btn glass-panel w-8 h-8 sm:w-9 sm:h-9 rounded-full text-sm sm:text-base flex items-center justify-center hover:scale-110 active:scale-90 transition cursor-pointer">🔥</button>
+        <button type="button" data-emoji="😂" class="emoji-btn glass-panel w-8 h-8 sm:w-9 sm:h-9 rounded-full text-sm sm:text-base flex items-center justify-center hover:scale-110 active:scale-90 transition cursor-pointer">😂</button>
+        <button type="button" data-emoji="😱" class="emoji-btn glass-panel w-8 h-8 sm:w-9 sm:h-9 rounded-full text-sm sm:text-base flex items-center justify-center hover:scale-110 active:scale-90 transition cursor-pointer">😱</button>
+        <button type="button" data-emoji="🎉" class="emoji-btn glass-panel w-8 h-8 sm:w-9 sm:h-9 rounded-full text-sm sm:text-base flex items-center justify-center hover:scale-110 active:scale-90 transition cursor-pointer">🎉</button>
+      </div>
+
       <div class="hidden sm:block glass-panel rounded-xl px-3 py-1 text-[11px] text-amber-100/75">
         휠/핀치로 확대 · 드래그로 화면 이동 · 교차점 클릭으로 착수
       </div>
@@ -317,7 +368,7 @@
        MODAL 1: START / MODE & RULE SETTINGS MODAL
        ======================================================================== -->
   <div id="start-modal" class="modal-backdrop">
-    <div class="glass-panel rounded-3xl max-w-md w-full p-5 sm:p-6 border border-amber-300/35 space-y-4 max-h-[92vh] overflow-y-auto">
+    <div class="glass-panel rounded-3xl max-w-md w-full p-5 sm:p-6 border border-amber-300/35 space-y-4 max-h-[92vh] overflow-y-auto custom-scroll">
       <div class="text-center space-y-1">
         <div class="inline-block px-3 py-0.5 rounded-full bg-amber-500/20 border border-amber-300/40 text-amber-200 text-xs font-bold">
           20×20 전통 바둑판 · Three.js 3D
@@ -325,7 +376,7 @@
         <h1 class="font-display text-3xl sm:text-4xl text-amber-300 tracking-wide">3D 한국 전통 오목</h1>
       </div>
 
-      <!-- Mode Toggle: AI vs Local 2P vs Online 2P -->
+      <!-- Mode Toggle: AI vs Local 2P vs Online 2P & Spectate -->
       <div class="grid grid-cols-3 gap-1.5">
         <button id="mode-ai-btn" type="button"
           class="py-2.5 px-2 rounded-2xl font-display text-sm sm:text-base border-2 border-amber-300 bg-amber-400 text-stone-950 shadow transition cursor-pointer">
@@ -337,7 +388,7 @@
         </button>
         <button id="mode-online-btn" type="button"
           class="py-2.5 px-2 rounded-2xl font-display text-sm sm:text-base border border-white/15 bg-white/10 text-amber-100 hover:bg-white/20 transition cursor-pointer">
-          🌐 온라인 2인
+          🌐 온라인
         </button>
       </div>
 
@@ -377,7 +428,7 @@
         </div>
       </div>
 
-      <!-- Online 2P Network Setup Box -->
+      <!-- Online 2P & Spectate Network Setup Box -->
       <div id="online-setup-box" class="hidden bg-black/30 rounded-2xl p-3.5 border border-emerald-400/35 space-y-3">
         <div>
           <label for="online-nick-input" class="block text-[11px] font-bold text-emerald-300 mb-1">내 닉네임</label>
@@ -385,15 +436,19 @@
             class="w-full px-3 py-2 rounded-xl bg-stone-950/85 border border-emerald-300/35 text-white font-bold text-sm focus:outline-none focus:border-emerald-400" />
         </div>
 
-        <!-- Online Sub-tabs -->
-        <div class="grid grid-cols-2 gap-1.5 bg-stone-950/70 p-1 rounded-xl border border-white/10">
+        <!-- Online 3 Sub-tabs: Host / Join / Spectate -->
+        <div class="grid grid-cols-3 gap-1 bg-stone-950/70 p-1 rounded-xl border border-white/10">
           <button id="online-tab-host" type="button"
-            class="py-1.5 rounded-lg text-xs font-bold bg-emerald-500 text-stone-950 transition cursor-pointer">
+            class="py-1.5 rounded-lg text-[11px] sm:text-xs font-bold bg-emerald-500 text-stone-950 transition cursor-pointer">
             🏠 방 만들기
           </button>
           <button id="online-tab-join" type="button"
-            class="py-1.5 rounded-lg text-xs font-bold text-amber-100/80 hover:bg-white/10 transition cursor-pointer">
+            class="py-1.5 rounded-lg text-[11px] sm:text-xs font-bold text-amber-100/80 hover:bg-white/10 transition cursor-pointer">
             🚪 방 참여
+          </button>
+          <button id="online-tab-spectate" type="button"
+            class="py-1.5 rounded-lg text-[11px] sm:text-xs font-bold text-amber-100/80 hover:bg-white/10 transition cursor-pointer">
+            👀 관전하기
           </button>
         </div>
 
@@ -407,19 +462,28 @@
           </div>
 
           <div id="host-waiting-box" class="hidden bg-emerald-950/50 border border-emerald-400/40 rounded-2xl p-3 text-center space-y-2.5">
-            <div class="text-[11px] font-bold text-emerald-300">4자리 방 코드</div>
+            <div class="flex items-center justify-between text-[11px] font-bold px-1">
+              <span class="text-emerald-300">4자리 방 코드</span>
+              <span id="host-waiting-spec-count" class="text-purple-200">👀 관전자 0명</span>
+            </div>
             <div id="room-code-display" class="font-display text-4xl tracking-[0.22em] text-amber-300 select-all">0000</div>
+
             <div class="grid grid-cols-2 gap-1.5">
-              <button id="copy-code-btn" type="button"
-                class="py-2 px-2 rounded-xl bg-white/15 hover:bg-white/25 border border-white/20 text-xs font-bold text-white transition cursor-pointer">
-                📋 코드 복사
-              </button>
               <button id="copy-link-btn" type="button"
-                class="py-2 px-2 rounded-xl bg-emerald-500/30 hover:bg-emerald-500/45 border border-emerald-300/40 text-xs font-bold text-emerald-200 transition cursor-pointer">
-                🔗 초대 링크 복사
+                class="py-2 px-2 rounded-xl bg-emerald-500/30 hover:bg-emerald-500/45 border border-emerald-300/45 text-[11px] sm:text-xs font-bold text-emerald-200 transition cursor-pointer">
+                🔗 대결 초대 링크
+              </button>
+              <button id="copy-spec-link-btn" type="button"
+                class="py-2 px-2 rounded-xl bg-purple-500/30 hover:bg-purple-500/45 border border-purple-300/45 text-[11px] sm:text-xs font-bold text-purple-200 transition cursor-pointer">
+                👀 관전 링크 복사
               </button>
             </div>
-            <div id="host-status-text" class="text-[11px] text-amber-200 animate-pulse">⏳ 상대방 입장을 기다리는 중...</div>
+            <button id="copy-code-btn" type="button"
+              class="w-full py-1.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-[11px] font-bold text-white transition cursor-pointer">
+              📋 방 번호만 복사
+            </button>
+
+            <div id="host-status-text" class="text-[11px] text-amber-200 animate-pulse">⏳ 도전자 입장을 기다리는 중...</div>
             <button id="cancel-room-btn" type="button"
               class="w-full py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/35 border border-rose-400/30 text-[11px] font-bold text-rose-200 cursor-pointer">
               방 생성 취소
@@ -430,15 +494,29 @@
         <!-- Guest Sub-panel -->
         <div id="online-join-panel" class="hidden space-y-2.5">
           <div>
-            <label for="join-code-input" class="block text-[11px] text-amber-200/80 mb-1">4자리 방 코드 입력</label>
+            <label for="join-code-input" class="block text-[11px] text-amber-200/80 mb-1">4자리 방 번호 입력 (백 후공 참가)</label>
             <input id="join-code-input" type="text" inputmode="numeric" maxlength="4" placeholder="예: 4829"
               class="w-full px-3 py-2.5 rounded-xl bg-stone-950/90 border border-amber-300/40 text-amber-300 font-display text-2xl tracking-[0.28em] text-center focus:outline-none focus:border-emerald-400" />
           </div>
           <button id="join-room-btn" type="button"
             class="btn-primary w-full py-2.5 rounded-xl font-display text-base text-stone-950">
-            입장하기 (백 후공)
+            대국 입장하기 (백 후공)
           </button>
           <div id="join-status-text" class="text-[11px] text-center text-amber-100/80 min-h-[16px]"></div>
+        </div>
+
+        <!-- Spectator Sub-panel -->
+        <div id="online-spectate-panel" class="hidden space-y-2.5">
+          <div>
+            <label for="spec-code-input" class="block text-[11px] text-purple-200/85 mb-1">4자리 방 번호 입력 (대국 중 중도 입장 가능)</label>
+            <input id="spec-code-input" type="text" inputmode="numeric" maxlength="4" placeholder="예: 4829"
+              class="w-full px-3 py-2.5 rounded-xl bg-stone-950/90 border border-purple-400/45 text-purple-200 font-display text-2xl tracking-[0.28em] text-center focus:outline-none focus:border-purple-400" />
+          </div>
+          <button id="spectate-room-btn" type="button"
+            class="w-full py-2.5 rounded-xl font-display text-base bg-gradient-to-b from-purple-400 to-purple-600 border-2 border-purple-200 text-stone-950 shadow-lg hover:brightness-105 active:translate-y-0.5 transition cursor-pointer">
+            👀 관전 입장하기
+          </button>
+          <div id="spec-status-text" class="text-[11px] text-center text-purple-200/85 min-h-[16px]"></div>
         </div>
       </div>
 
@@ -468,7 +546,7 @@
         </button>
         <button id="cancel-settings-btn" type="button"
           class="hidden w-full py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 text-xs font-bold text-amber-100 transition cursor-pointer">
-          계속 대국하기
+          계속 보기/대국하기
         </button>
       </div>
     </div>
@@ -553,7 +631,9 @@
         [1, -1]   // Diagonal /
       ];
 
-      const PEER_PREFIX = 'omok-3d-';
+      const MAX_SPECTATORS = 10;
+      const MAX_CHAT_MESSAGES = 50;
+      const PEER_PREFIX = 'omok-';
       const PEER_CONFIG = {
         config: {
           iceServers: [
@@ -565,7 +645,6 @@
       };
 
       function coordLabel(r, c) {
-        // Row 0 is top (20), Row 19 is bottom (1)
         return `${COL_LABELS[c]}${BOARD_N - r}`;
       }
 
@@ -584,7 +663,7 @@
       }
 
       /* --------------------------------------------------------------------------
-       * 2. PROCEDURAL WEB AUDIO SOUND MANAGER
+       * 2. PROCEDURAL WEB AUDIO SOUND MANAGER (WITH CHAT PING)
        * -------------------------------------------------------------------------- */
       class SoundManager {
         constructor() {
@@ -612,7 +691,6 @@
           if (!ctx) return;
           try {
             const now = ctx.currentTime;
-            // Short noise impact
             const bufLen = Math.floor(ctx.sampleRate * 0.035);
             const buf = ctx.createBuffer(1, bufLen, ctx.sampleRate);
             const data = buf.getChannelData(0);
@@ -633,7 +711,6 @@
             nGain.connect(ctx.destination);
             noise.start(now);
 
-            // Wooden board resonant thump
             const osc = ctx.createOscillator();
             const oGain = ctx.createGain();
             osc.type = 'triangle';
@@ -648,7 +725,6 @@
             osc.stop(now + 0.075);
           } catch (e) {}
         }
-        // Subtle tick on preview
         playPreviewTick() {
           const ctx = this.ensureContext();
           if (!ctx) return;
@@ -667,7 +743,6 @@
             osc.stop(now + 0.04);
           } catch (e) {}
         }
-        // Error buzz on forbidden move
         playForbidden() {
           const ctx = this.ensureContext();
           if (!ctx) return;
@@ -690,7 +765,6 @@
             osc.stop(now + 0.22);
           } catch (e) {}
         }
-        // Victory fanfare
         playVictory() {
           const ctx = this.ensureContext();
           if (!ctx) return;
@@ -712,7 +786,6 @@
             });
           } catch (e) {}
         }
-        // Emoji pop
         playEmoji() {
           const ctx = this.ensureContext();
           if (!ctx) return;
@@ -731,6 +804,25 @@
             osc.stop(now + 0.12);
           } catch (e) {}
         }
+        playChatPing() {
+          const ctx = this.ensureContext();
+          if (!ctx) return;
+          try {
+            const now = ctx.currentTime;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(880, now);
+            osc.frequency.setValueAtTime(1174.66, now + 0.055);
+            gain.gain.setValueAtTime(0.001, now);
+            gain.gain.linearRampToValueAtTime(0.08, now + 0.01);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.15);
+          } catch (e) {}
+        }
       }
 
       const sound = new SoundManager();
@@ -742,7 +834,6 @@
         return r >= 0 && r < BOARD_N && c >= 0 && c < BOARD_N;
       }
 
-      // Count contiguous stones of `color` through (r, c) along (dr, dc)
       function getLineCells(board, r, c, dr, dc, color) {
         const cells = [[r, c]];
         let nr = r + dr, nc = c + dc;
@@ -761,7 +852,6 @@
         return cells;
       }
 
-      // Returns winning 5+ stone coordinates or null
       function checkWinnerAt(board, r, c, color, isRenju) {
         for (const [dr, dc] of DIRS) {
           const cells = getLineCells(board, r, c, dr, dc, color);
@@ -774,7 +864,6 @@
         return null;
       }
 
-      // Helper: Does placing Black at (r,c) create an exact 5 along (dr,dc)?
       function makesExactFiveInDir(board, r, c, dr, dc) {
         let count = 1;
         let nr = r + dr, nc = c + dc;
@@ -784,12 +873,7 @@
         return count === 5;
       }
 
-      // Helper: Count distinct "fours" in a single direction (dr, dc) assuming board[r][c] === 1
-      // A "four" exists if there is an empty cell along the line where Black makes exact 5.
-      // Two distinct empty cells that each make exact 5 on the same line count as 2 fours (e.g. B _ B B _ B),
-      // EXCEPT a straight open four (_ B B B B _) where both ends make 5 counts as ONE four!
       function countFoursInDir(board, r, c, dr, dc) {
-        // Scan up to 4 steps in both directions along the line
         const line = [];
         for (let step = -4; step <= 4; step++) {
           const nr = r + dr * step;
@@ -804,20 +888,16 @@
           board[cell.r][cell.c] = 1;
           const isFive = makesExactFiveInDir(board, cell.r, cell.c, dr, dc);
           board[cell.r][cell.c] = 0;
-          if (isFive) {
-            winEmpties.push(cell);
-          }
+          if (isFive) winEmpties.push(cell);
         }
         if (winEmpties.length === 0) return 0;
         if (winEmpties.length === 1) return 1;
-        // Check if two winEmpties are the two ends of a single contiguous 4-stone block (_ B B B B _)
         if (winEmpties.length === 2 && Math.abs(winEmpties[1].step - winEmpties[0].step) === 5) {
-          return 1; // Single open four
+          return 1;
         }
-        return 2; // Double-four on the same axis (e.g., B _ B B _ B)
+        return 2;
       }
 
-      // Helper: Does (r, c) form an open-four in direction (dr, dc) assuming board[r][c] === 1?
       function isOpenFourInDir(board, r, c, dr, dc) {
         const cells = getLineCells(board, r, c, dr, dc, 1);
         if (cells.length !== 4) return false;
@@ -827,7 +907,6 @@
         const afterR = r3 + dr, afterC = c3 + dc;
         if (!inBounds(beforeR, beforeC) || !inBounds(afterR, afterC)) return false;
         if (board[beforeR][beforeC] !== 0 || board[afterR][afterC] !== 0) return false;
-        // Neither end should create an overline (6+)
         const before2R = beforeR - dr, before2C = beforeC - dc;
         const after2R = afterR + dr, after2C = afterC + dc;
         const beforeOverline = inBounds(before2R, before2C) && board[before2R][before2C] === 1;
@@ -835,10 +914,7 @@
         return !beforeOverline && !afterOverline;
       }
 
-      // Helper: Does board[r][c] === 1 form an "open three" in direction (dr, dc)?
       function isOpenThreeInDir(board, r, c, dr, dc, depth) {
-        // Test empty cells within 3 steps along (dr, dc): if placing Black there creates an open four
-        // AND that move is not itself forbidden, then this direction has an open three.
         for (let step = -3; step <= 3; step++) {
           if (step === 0) continue;
           const nr = r + dr * step;
@@ -857,31 +933,22 @@
         return false;
       }
 
-      /**
-       * Checks if placing Black (1) at empty (r, c) is forbidden under Renju rules.
-       * Returns string reason ('장목 금수', '4·4 금수', '3·3 금수') or null if legal.
-       */
       function getRenjuForbiddenReason(board, r, c, depth = 2) {
         if (!inBounds(r, c) || board[r][c] !== 0) return null;
         board[r][c] = 1;
 
-        // 1. Exact 5 always wins (takes precedence over any forbidden pattern)
         for (const [dr, dc] of DIRS) {
           if (getLineCells(board, r, c, dr, dc, 1).length === 5) {
             board[r][c] = 0;
             return null;
           }
         }
-
-        // 2. Overline (6 or more in a row)
         for (const [dr, dc] of DIRS) {
           if (getLineCells(board, r, c, dr, dc, 1).length >= 6) {
             board[r][c] = 0;
             return '장목(6목 이상) 금수';
           }
         }
-
-        // 3. Double-Four (4·4)
         let fourCount = 0;
         for (const [dr, dc] of DIRS) {
           fourCount += countFoursInDir(board, r, c, dr, dc);
@@ -890,8 +957,6 @@
             return '4·4 금수';
           }
         }
-
-        // 4. Double-Three (3·3)
         let openThreeCount = 0;
         for (const [dr, dc] of DIRS) {
           if (isOpenThreeInDir(board, r, c, dr, dc, depth)) {
@@ -922,7 +987,6 @@
         let openThrees = 0;
 
         for (const [dr, dc] of DIRS) {
-          // Contiguous count + open ends
           let count = 1;
           let openEnds = 0;
 
@@ -930,7 +994,6 @@
           while (inBounds(nr, nc) && board[nr][nc] === color) { count++; nr += dr; nc += dc; }
           if (inBounds(nr, nc) && board[nr][nc] === 0) {
             openEnds++;
-            // Check 1-gap continuation (e.g. X X _ X)
             const jr = nr + dr, jc = nc + dc;
             if (inBounds(jr, jc) && board[jr][jc] === color) {
               let jumpCount = 0;
@@ -974,7 +1037,6 @@
           }
         }
 
-        // Threat combination bonuses (4-4, 4-3, 3-3)
         if (openFours >= 1) totalScore += 60000;
         if (closedFours >= 2) totalScore += 95000;
         if (closedFours >= 1 && openThrees >= 1) totalScore += 85000;
@@ -1017,22 +1079,18 @@
         const oppColor = aiColor === 1 ? 2 : 1;
         const candidates = getCandidateMoves(board);
         const scored = [];
-
         const defWeight = difficulty === 'hard' ? 1.12 : difficulty === 'normal' ? 1.02 : 0.78;
 
         for (const cand of candidates) {
           const atk = evaluatePointForColor(board, cand.r, cand.c, aiColor, isRenju);
-          if (atk < 0) continue; // Forbidden for AI Black
+          if (atk < 0) continue;
           const def = evaluatePointForColor(board, cand.r, cand.c, oppColor, isRenju);
 
-          // Immediate winning move
           if (atk >= 2000000) return cand;
 
-          // Center proximity tie-breaker
           const distCenter = Math.abs(cand.r - 9.5) + Math.abs(cand.c - 9.5);
           const centerBonus = Math.max(0, 20 - distCenter) * 3;
 
-          // Urgent defense against opponent immediate win or open 4
           let score = atk + Math.max(0, def) * defWeight + centerBonus;
           if (def >= 2000000) score += 1200000;
           else if (def >= 140000) score += 220000;
@@ -1041,7 +1099,6 @@
         }
 
         if (scored.length === 0) {
-          // Fallback: find any legal empty cell
           for (let r = 0; r < BOARD_N; r++) {
             for (let c = 0; c < BOARD_N; c++) {
               if (board[r][c] === 0 && !(isRenju && aiColor === 1 && getRenjuForbiddenReason(board, r, c, 1))) {
@@ -1054,7 +1111,6 @@
 
         scored.sort((a, b) => b.score - a.score);
 
-        // Hard mode: 1-ply opponent counter-threat check among top 8 moves
         if (difficulty === 'hard' && scored[0].score < 1000000) {
           const topK = scored.slice(0, Math.min(8, scored.length));
           let bestMove = topK[0];
@@ -1062,7 +1118,6 @@
 
           for (const mv of topK) {
             board[mv.r][mv.c] = aiColor;
-            // Find opponent's strongest reply among top local cells
             let oppBest = 0;
             const replyCands = getCandidateMoves(board);
             for (const rc of replyCands) {
@@ -1081,14 +1136,12 @@
           return { r: bestMove.r, c: bestMove.c };
         }
 
-        // Easy mode: add casual randomness among top 4 moves unless immediate win/block
         if (difficulty === 'easy' && scored[0].score < 120000) {
           const pool = scored.slice(0, Math.min(4, scored.length));
           const pick = pool[Math.floor(Math.random() * pool.length)];
           return { r: pick.r, c: pick.c };
         }
 
-        // Normal mode: tiny jitter for variety on equal scores
         const topEqual = scored.filter((s) => s.score >= scored[0].score * 0.97).slice(0, 3);
         const chosen = topEqual[Math.floor(Math.random() * topEqual.length)];
         return { r: chosen.r, c: chosen.c };
@@ -1102,18 +1155,17 @@
       let stoneGroup = null, winRingGroup = null;
       let ghostStoneMesh = null, lastMoveMarker = null, forbiddenXGroup = null;
       let blackStoneMat = null, whiteStoneMat = null, stoneGeo = null;
-      let stoneMeshes = []; // 2D array [20][20] of Three.js meshes
+      let stoneMeshes = [];
       let droppingStones = [];
       let threeReady = false;
 
-      // Camera state: spherical pitch from vertical + zoom distance + pan target (x, z)
       const camCtrl = {
         viewMode: '3d', // '3d' | '2d'
         zoom: 24.5,
         targetZoom: 24.5,
         minZoom: 11.5,
         maxZoom: 34.0,
-        pitch: 0.30,       // ~73 deg elevation (clear 20x20 visibility)
+        pitch: 0.30,
         targetPitch: 0.30,
         panX: 0,
         panZ: 0.5,
@@ -1150,9 +1202,7 @@
           ctx.stroke();
         }
 
-        // Helper: map intersection index (0..19) to exact canvas pixel matching 3D world coords
         const idxToPx = (idx) => (((idx - BOARD_HALF_OFFSET) * CELL_SIZE) / BOARD_WORLD_SIZE + 0.5) * size;
-
         const firstPx = idxToPx(0);
         const lastPx = idxToPx(BOARD_N - 1);
 
@@ -1166,14 +1216,11 @@
         for (let i = 0; i < BOARD_N; i++) {
           const p = idxToPx(i);
           ctx.lineWidth = (i === 0 || i === BOARD_N - 1) ? 4.2 : 2.5;
-
-          // Vertical line
           ctx.beginPath();
           ctx.moveTo(p, firstPx);
           ctx.lineTo(p, lastPx);
           ctx.stroke();
 
-          // Horizontal line
           ctx.beginPath();
           ctx.moveTo(firstPx, p);
           ctx.lineTo(lastPx, p);
@@ -1197,10 +1244,8 @@
         const marginOffset = firstPx * 0.50;
         for (let i = 0; i < BOARD_N; i++) {
           const p = idxToPx(i);
-          // Column letters A..T
           ctx.fillText(COL_LABELS[i], p, marginOffset);
           ctx.fillText(COL_LABELS[i], p, size - marginOffset);
-          // Row numbers 20..1
           const rowNum = String(BOARD_N - i);
           ctx.fillText(rowNum, marginOffset, p);
           ctx.fillText(rowNum, size - marginOffset, p);
@@ -1236,7 +1281,6 @@
         const w = window.innerWidth;
         const h = window.innerHeight;
         const aspect = w / Math.max(1, h);
-        // Portrait mobile screens need slightly further distance to fit full 20x20 width
         if (aspect < 0.72) return 35.5;
         if (aspect < 1.0) return 30.5;
         return 25.0;
@@ -1294,7 +1338,7 @@
           floor.receiveShadow = true;
           scene.add(floor);
 
-          // 3D Wooden Goban (바둑판)
+          // 3D Wooden Goban
           const boardHeight = 1.2;
           const boardGeo = new THREE.BoxGeometry(BOARD_WORLD_SIZE, boardHeight, BOARD_WORLD_SIZE);
           const sideMat = new THREE.MeshStandardMaterial({ color: 0x9c6632, roughness: 0.55 });
@@ -1305,7 +1349,7 @@
           boardMesh.castShadow = true;
           scene.add(boardMesh);
 
-          // Invisible raycast plane at exact y = 0
+          // Invisible raycast plane at y = 0
           boardHitPlane = new THREE.Mesh(
             new THREE.PlaneGeometry(BOARD_WORLD_SIZE, BOARD_WORLD_SIZE),
             new THREE.MeshBasicMaterial({ visible: false })
@@ -1415,17 +1459,19 @@
         if (forbiddenXGroup) forbiddenXGroup.visible = false;
       }
 
-      function addStoneMesh(r, c, color) {
+      function addStoneMesh(r, c, color, instant = false) {
         if (!threeReady) return;
         const { x, z } = gridToWorld(r, c);
         const mesh = new THREE.Mesh(stoneGeo, color === 1 ? blackStoneMat : whiteStoneMat);
-        mesh.position.set(x, 1.15, z);
+        mesh.position.set(x, instant ? 0.198 : 1.15, z);
         mesh.castShadow = true;
         mesh.receiveShadow = true;
         stoneGroup.add(mesh);
         stoneMeshes[r][c] = mesh;
 
-        droppingStones.push({ mesh, y: 1.15, targetY: 0.198, vel: -5.5 });
+        if (!instant) {
+          droppingStones.push({ mesh, y: 1.15, targetY: 0.198, vel: -5.5 });
+        }
 
         lastMoveMarker.position.set(x, 0.405, z);
         lastMoveMarker.visible = true;
@@ -1507,11 +1553,14 @@
         dom.addEventListener('pointermove', (e) => {
           if (isAnyModalOpen()) return;
 
-          // Hover ghost preview on desktop (mouse without button pressed)
+          // Hover ghost preview on desktop (only when player can act)
           if (activePointers.size === 0 && e.pointerType === 'mouse') {
             if (!game.confirmMode && canHumanAct()) {
               const cell = raycastBoard(e.clientX, e.clientY);
               updateHoverGhost(cell);
+            } else {
+              if (ghostStoneMesh) ghostStoneMesh.visible = false;
+              hideForbiddenX();
             }
             return;
           }
@@ -1552,7 +1601,7 @@
           if (activePointers.has(e.pointerId)) {
             const wasSingle = activePointers.size === 1;
             activePointers.delete(e.pointerId);
-            if (wasSingle && !moved && !isAnyModalOpen()) {
+            if (wasSingle && !moved && !isAnyModalOpen() && canHumanAct()) {
               const cell = raycastBoard(e.clientX, e.clientY);
               if (cell) handleBoardTap(cell.r, cell.c);
             }
@@ -1563,7 +1612,7 @@
         dom.addEventListener('pointerup', endPointer);
         dom.addEventListener('pointercancel', endPointer);
 
-        // Mouse wheel zoom
+        // Mouse wheel zoom (available to players & spectators alike)
         dom.addEventListener('wheel', (e) => {
           if (isAnyModalOpen()) return;
           e.preventDefault();
@@ -1577,33 +1626,47 @@
       }
 
       /* --------------------------------------------------------------------------
-       * 6. GAME STATE & PEERJS MULTIPLAYER STATE
+       * 6. GAME STATE, HOST-HUB NETWORK STATE & CHAT STATE
        * -------------------------------------------------------------------------- */
       const game = {
         mode: 'ai',          // 'ai' | 'local' | 'online'
         rule: 'renju',       // 'renju' | 'free'
-        aiDifficulty: 'normal', // 'easy' | 'normal' | 'hard'
+        aiDifficulty: 'normal',
         humanColor: 1,       // 1 = Black, 2 = White (for AI mode)
         started: false,
         over: false,
+        winnerColor: null,   // null | 0 (draw) | 1 (black) | 2 (white)
+        winCells: null,
         turn: 1,             // 1 = Black, 2 = White
         board: [],           // 20x20: 0 empty, 1 black, 2 white
         history: [],         // [{ r, c, color }]
         names: { 1: '플레이어', 2: 'AI (보통)' },
         aiThinking: false,
-        confirmMode: window.innerWidth < 768, // Default ON on mobile for 20x20 precision
-        previewCell: null    // { r, c } when confirmMode is ON
+        confirmMode: window.innerWidth < 768,
+        previewCell: null
       };
 
       const net = {
         peer: null,
-        conn: null,
-        role: null,      // 'host' | 'guest'
+        conn: null,          // Guest or Spectator -> Host
+        guestConn: null,     // Host -> Guest
+        spectators: [],      // Host -> [{ conn, name }]
+        spectatorCount: 0,
+        role: null,          // 'host' | 'guest' | 'spectator' | null
+        myName: '오목고수',
         roomCode: '',
         connected: false,
-        myColor: 1,      // 1 = Black, 2 = White
+        matchActive: false,
+        myColor: 1,          // 1 = Black, 2 = White, 0 = Spectator
+        hostColor: 1,        // Tracks which color Host currently plays (swaps on rematch)
         myRematch: false,
         oppRematch: false
+      };
+
+      const chatState = {
+        messages: [],
+        isOpen: window.innerWidth >= 640,
+        unread: 0
       };
 
       function resetBoardState() {
@@ -1611,38 +1674,93 @@
         game.history = [];
         game.turn = 1;
         game.over = false;
+        game.winnerColor = null;
+        game.winCells = null;
         game.aiThinking = false;
         game.previewCell = null;
         resetStoneMeshGrid();
         hideConfirmBar();
       }
 
+      function isSpectator() {
+        return game.mode === 'online' && net.role === 'spectator';
+      }
+
+      function myRoleTag() {
+        if (net.role === 'host') return '방장';
+        if (net.role === 'guest') return '도전자';
+        return '관전';
+      }
+
       function canHumanAct() {
         if (!game.started || game.over || game.aiThinking) return false;
         if (game.mode === 'ai') return game.turn === game.humanColor;
-        if (game.mode === 'online') return net.connected && game.turn === net.myColor;
+        if (game.mode === 'online') {
+          if (isSpectator()) return false;
+          return net.connected && net.matchActive && game.turn === net.myColor;
+        }
         return true; // local 2p
       }
 
-      function sendNet(payload) {
-        if (game.mode !== 'online' || !net.conn || !net.conn.open) return;
-        try {
-          net.conn.send(payload);
-        } catch (err) {
-          console.warn('PeerJS send error:', err);
+      // Host hub broadcast to Guest + all Spectators (optionally excluding senderConn)
+      function broadcastFromHost(payload, excludeConn = null) {
+        if (net.role !== 'host') return;
+        if (net.guestConn && net.guestConn.open && net.guestConn !== excludeConn) {
+          try { net.guestConn.send(payload); } catch (e) {}
         }
+        for (const sp of net.spectators) {
+          if (sp.conn && sp.conn.open && sp.conn !== excludeConn) {
+            try { sp.conn.send(payload); } catch (e) {}
+          }
+        }
+      }
+
+      function sendNet(payload) {
+        if (game.mode !== 'online') return;
+        if (net.role === 'host') {
+          broadcastFromHost(payload);
+        } else if (net.conn && net.conn.open) {
+          try { net.conn.send(payload); } catch (e) {}
+        }
+      }
+
+      function buildFullSyncState() {
+        return {
+          started: game.started,
+          matchActive: net.matchActive,
+          rule: game.rule,
+          turn: game.turn,
+          over: game.over,
+          winnerColor: game.winnerColor,
+          winCells: game.winCells,
+          names: { 1: game.names[1], 2: game.names[2] },
+          board: game.board.map((row) => row.slice()),
+          history: game.history.slice(),
+          spectatorCount: net.spectatorCount,
+          chatHistory: chatState.messages.slice(-20)
+        };
       }
 
       function cleanupNetwork() {
         net.connected = false;
+        net.matchActive = false;
         net.role = null;
         net.roomCode = '';
+        net.spectatorCount = 0;
         net.myRematch = false;
         net.oppRematch = false;
         if (net.conn) {
           try { net.conn.close(); } catch (e) {}
           net.conn = null;
         }
+        if (net.guestConn) {
+          try { net.guestConn.close(); } catch (e) {}
+          net.guestConn = null;
+        }
+        for (const sp of net.spectators) {
+          try { if (sp.conn) sp.conn.close(); } catch (e) {}
+        }
+        net.spectators = [];
         if (net.peer) {
           try { net.peer.destroy(); } catch (e) {}
           net.peer = null;
@@ -1650,7 +1768,7 @@
       }
 
       /* --------------------------------------------------------------------------
-       * 7. DOM HELPERS, TOASTS & HUD UPDATES
+       * 7. DOM HELPERS, CHAT UI, TOASTS & HUD UPDATES
        * -------------------------------------------------------------------------- */
       const elStartModal = document.getElementById('start-modal');
       const elResultModal = document.getElementById('result-modal');
@@ -1666,6 +1784,14 @@
           !elResultModal.classList.contains('modal-hidden') ||
           !elDisconnectModal.classList.contains('modal-hidden')
         );
+      }
+
+      function escapeHtml(str) {
+        return String(str || '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
       }
 
       function showConfirmBar(r, c) {
@@ -1716,14 +1842,88 @@
         const wrap = document.createElement('div');
         wrap.className = 'floating-emoji flex flex-col items-center';
         wrap.style.left = `${26 + Math.random() * 48}%`;
-        wrap.style.bottom = '18%';
+        wrap.style.bottom = '20%';
         wrap.innerHTML = `
-          <div class="text-4xl sm:text-5xl drop-shadow-lg">${emoji}</div>
-          <div class="text-[10px] font-bold bg-black/70 text-amber-200 px-2 py-0.5 rounded-full mt-0.5 whitespace-nowrap">${senderName}</div>
+          <div class="text-4xl sm:text-5xl drop-shadow-lg">${escapeHtml(emoji)}</div>
+          <div class="text-[10px] font-bold bg-black/70 text-amber-200 px-2 py-0.5 rounded-full mt-0.5 whitespace-nowrap">${escapeHtml(senderName)}</div>
         `;
         layer.appendChild(wrap);
         sound.playEmoji();
-        setTimeout(() => { if (wrap.parentNode) wrap.parentNode.removeChild(wrap); }, 1800);
+        setTimeout(() => { if (wrap.parentNode) wrap.parentNode.removeChild(wrap); }, 1850);
+      }
+
+      function resetChat() {
+        chatState.messages = [];
+        chatState.unread = 0;
+        renderChatMessages();
+        updateChatPanelVisibility();
+      }
+
+      function appendChatMessage(msg, playPing = true) {
+        chatState.messages.push(msg);
+        if (chatState.messages.length > MAX_CHAT_MESSAGES) {
+          chatState.messages.shift();
+        }
+        if (!chatState.isOpen && !msg.isSelf) {
+          chatState.unread += 1;
+        }
+        if (playPing && !msg.isSelf) {
+          sound.playChatPing();
+        }
+        renderChatMessages();
+        updateChatPanelVisibility();
+      }
+
+      function renderChatMessages() {
+        const container = document.getElementById('chat-messages');
+        if (!container) return;
+        if (chatState.messages.length === 0) {
+          container.innerHTML = '<div class="text-amber-100/50 text-center py-4">응원 메시지나 대국 소감을 남겨보세요!</div>';
+          return;
+        }
+        container.innerHTML = chatState.messages.map((m) => {
+          if (m.system) {
+            return `<div class="text-center text-[10px] text-emerald-300/90 bg-emerald-950/40 rounded-lg py-0.5 px-2">${escapeHtml(m.text)}</div>`;
+          }
+          const badgeClass = m.roleTag === '방장'
+            ? 'bg-amber-400/25 text-amber-300 border-amber-400/40'
+            : m.roleTag === '도전자'
+            ? 'bg-sky-400/25 text-sky-300 border-sky-400/40'
+            : 'bg-purple-400/25 text-purple-200 border-purple-400/40';
+          return `
+            <div class="break-words">
+              <span class="inline-block px-1 py-0.2 rounded border text-[9px] font-bold mr-1 ${badgeClass}">[${escapeHtml(m.roleTag)}]</span>
+              <span class="font-bold text-amber-100 mr-1">${escapeHtml(m.sender)}:</span>
+              <span class="text-white/95">${escapeHtml(m.text)}</span>
+            </div>
+          `;
+        }).join('');
+        container.scrollTop = container.scrollHeight;
+      }
+
+      function updateChatPanelVisibility() {
+        const showOnlineSocial = game.mode === 'online' && net.connected;
+        document.getElementById('chat-wrapper').classList.toggle('hidden', !showOnlineSocial);
+        document.getElementById('emoji-bar').classList.toggle('hidden', !showOnlineSocial);
+
+        const chatBox = document.getElementById('chat-box');
+        const toggleBtn = document.getElementById('chat-toggle-btn');
+        const unreadBadge = document.getElementById('chat-unread-badge');
+
+        if (chatState.isOpen) {
+          chatBox.classList.remove('hidden');
+          toggleBtn.classList.add('hidden');
+          chatState.unread = 0;
+        } else {
+          chatBox.classList.add('hidden');
+          toggleBtn.classList.remove('hidden');
+          if (chatState.unread > 0) {
+            unreadBadge.textContent = chatState.unread > 99 ? '99+' : String(chatState.unread);
+            unreadBadge.classList.remove('hidden');
+          } else {
+            unreadBadge.classList.add('hidden');
+          }
+        }
       }
 
       function updateHUD() {
@@ -1746,17 +1946,27 @@
         document.getElementById('rule-badge-hud').textContent =
           game.rule === 'renju' ? '📜 렌주룰 (20×20)' : '📜 자유룰 (20×20)';
 
-        // Online HUD elements
+        // Online & Spectator HUD badges
         const netPill = document.getElementById('net-status-pill');
+        const specPill = document.getElementById('spectator-count-pill');
         const turnBanner = document.getElementById('online-turn-banner');
-        const emojiBar = document.getElementById('emoji-bar');
         if (game.mode === 'online') {
           netPill.classList.remove('hidden');
+          specPill.classList.remove('hidden');
           turnBanner.classList.remove('hidden');
-          emojiBar.classList.toggle('hidden', !net.connected || !game.started);
 
-          netPill.textContent = net.connected ? `🟢 연결됨 (${net.roomCode})` : '🔴 연결 끊김';
-          if (game.turn === net.myColor) {
+          netPill.textContent = net.connected ? `🟢 방 ${net.roomCode}` : '🔴 연결 끊김';
+          specPill.textContent = `👀 ${net.spectatorCount}명`;
+
+          const hostWaitSpec = document.getElementById('host-waiting-spec-count');
+          if (hostWaitSpec) hostWaitSpec.textContent = `👀 관전자 ${net.spectatorCount}명`;
+
+          if (isSpectator()) {
+            turnBanner.textContent = net.matchActive
+              ? (game.over ? '👀 관전 중 (대국 종료)' : `👀 관전 중 (현재 ${game.names[game.turn]}님 차례)`)
+              : '👀 관전 대기 중 (도전자 입장 대기)';
+            turnBanner.className = 'glass-panel rounded-full px-2.5 py-0.5 text-[10px] sm:text-[11px] font-bold text-purple-200 border border-purple-400/55 bg-purple-500/20';
+          } else if (game.turn === net.myColor) {
             turnBanner.textContent = `🎯 내 차례 (${net.myColor === 1 ? '흑' : '백'})`;
             turnBanner.className = 'glass-panel rounded-full px-2.5 py-0.5 text-[10px] sm:text-[11px] font-bold text-amber-200 border border-amber-300/60 bg-amber-500/20';
           } else {
@@ -1765,8 +1975,23 @@
           }
         } else {
           netPill.classList.add('hidden');
+          specPill.classList.add('hidden');
           turnBanner.classList.add('hidden');
-          emojiBar.classList.add('hidden');
+        }
+
+        updateChatPanelVisibility();
+
+        // Hide confirm toggle & confirm bar completely for spectators
+        const confirmBtn = document.getElementById('confirm-toggle-btn');
+        if (isSpectator()) {
+          confirmBtn.classList.add('hidden');
+          hideConfirmBar();
+        } else {
+          confirmBtn.classList.remove('hidden');
+          confirmBtn.textContent = `착수확인: ${game.confirmMode ? 'ON' : 'OFF'}`;
+          confirmBtn.className = game.confirmMode
+            ? 'px-2 sm:px-2.5 py-1.5 rounded-xl bg-emerald-500/25 hover:bg-emerald-500/40 border border-emerald-300/45 text-[11px] sm:text-xs font-bold text-emerald-200 transition cursor-pointer whitespace-nowrap'
+            : 'px-2 sm:px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-[11px] sm:text-xs font-bold text-amber-100/80 transition cursor-pointer whitespace-nowrap';
         }
 
         // Undo button availability
@@ -1778,13 +2003,6 @@
           const minNeeded = game.mode === 'ai' ? (game.humanColor === 2 ? 2 : 1) : 1;
           undoBtn.disabled = !game.started || game.over || game.aiThinking || game.history.length < minNeeded;
         }
-
-        // Confirm toggle button visual
-        const confirmBtn = document.getElementById('confirm-toggle-btn');
-        confirmBtn.textContent = `착수확인: ${game.confirmMode ? 'ON' : 'OFF'}`;
-        confirmBtn.className = game.confirmMode
-          ? 'px-2 sm:px-2.5 py-1.5 rounded-xl bg-emerald-500/25 hover:bg-emerald-500/40 border border-emerald-300/45 text-[11px] sm:text-xs font-bold text-emerald-200 transition cursor-pointer whitespace-nowrap'
-          : 'px-2 sm:px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-[11px] sm:text-xs font-bold text-amber-100/80 transition cursor-pointer whitespace-nowrap';
 
         document.getElementById('view-toggle-btn').textContent =
           camCtrl.viewMode === '3d' ? '시점: 3D' : '시점: 2D';
@@ -1815,7 +2033,6 @@
       function handleBoardTap(r, c) {
         if (!canHumanAct()) return;
         sound.ensureContext();
-
         if (game.board[r][c] !== 0) return;
 
         // Check Renju forbidden move for Black
@@ -1824,7 +2041,7 @@
           if (reason) {
             sound.playForbidden();
             showForbiddenX(r, c);
-            showToast(`금수 자리입니다!`, `흑 ${reason} (${coordLabel(r, c)})`, 'fail', 1600);
+            showToast('금수 자리입니다!', `흑 ${reason} (${coordLabel(r, c)})`, 'fail', 1600);
             setTimeout(hideForbiddenX, 1400);
             return;
           }
@@ -1832,13 +2049,11 @@
         hideForbiddenX();
 
         if (game.confirmMode) {
-          // Tapping the already previewed cell confirms immediately
           if (game.previewCell && game.previewCell.r === r && game.previewCell.c === c) {
             hideConfirmBar();
             placeStone(r, c, game.turn, false);
             return;
           }
-          // Otherwise show translucent ghost preview and floating confirm bar
           game.previewCell = { r, c };
           if (threeReady && ghostStoneMesh) {
             const { x, z } = gridToWorld(r, c);
@@ -1861,7 +2076,7 @@
         hideConfirmBar();
         hideForbiddenX();
 
-        addStoneMesh(r, c, color);
+        addStoneMesh(r, c, color, false);
         sound.playStoneClack(color === 1);
 
         if (!isRemote && game.mode === 'online' && color === net.myColor) {
@@ -1872,6 +2087,8 @@
         const winCells = checkWinnerAt(game.board, r, c, color, game.rule === 'renju');
         if (winCells) {
           game.over = true;
+          game.winnerColor = color;
+          game.winCells = winCells;
           highlightWinningStones(winCells);
           sound.playVictory();
           updateHUD();
@@ -1882,6 +2099,7 @@
         // Check draw (all 400 cells filled)
         if (game.history.length >= BOARD_N * BOARD_N) {
           game.over = true;
+          game.winnerColor = 0;
           updateHUD();
           setTimeout(() => showResultModal(0), 400);
           return;
@@ -1908,9 +2126,7 @@
           }
           const mv = computeBestAIMove(game.board, aiColor, game.aiDifficulty, game.rule === 'renju');
           game.aiThinking = false;
-          if (mv) {
-            placeStone(mv.r, mv.c, aiColor, false);
-          }
+          if (mv) placeStone(mv.r, mv.c, aiColor, false);
         }, 280);
       }
 
@@ -1943,7 +2159,9 @@
       }
 
       function showResultModal(winnerColor) {
-        document.getElementById('rematch-status-text').classList.add('hidden');
+        const rematchBtn = document.getElementById('rematch-btn');
+        const statusEl = document.getElementById('rematch-status-text');
+        statusEl.classList.add('hidden');
         document.getElementById('result-moves').textContent = `${game.history.length}수`;
         document.getElementById('result-rule').textContent = game.rule === 'renju' ? '렌주룰' : '자유룰';
 
@@ -1960,16 +2178,23 @@
           document.getElementById('result-desc').textContent = `${colorText}돌이 5목을 완성하여 대국에서 승리했습니다.`;
         }
 
-        document.getElementById('rematch-btn').textContent =
-          game.mode === 'online' ? '🔄 다시 대결하기 (흑·백 교대)' : '다시 하기';
+        if (isSpectator()) {
+          rematchBtn.classList.add('hidden');
+          statusEl.textContent = '👀 두 대국자가 재대결을 시작하면 자동으로 새 대국이 열립니다...';
+          statusEl.classList.remove('hidden');
+        } else {
+          rematchBtn.classList.remove('hidden');
+          rematchBtn.textContent = game.mode === 'online' ? '🔄 다시 대결하기 (흑·백 교대)' : '다시 하기';
+        }
         showModal(elResultModal);
       }
 
       /* --------------------------------------------------------------------------
-       * 9. GAME START & PEERJS ONLINE MULTIPLAYER
+       * 9. GAME START & PEERJS HOST-HUB MULTIPLAYER + SPECTATOR
        * -------------------------------------------------------------------------- */
       function startLocalOrAIGame() {
         cleanupNetwork();
+        resetChat();
         resetBoardState();
         game.started = true;
 
@@ -1996,7 +2221,6 @@
           1500
         );
 
-        // If AI plays Black (first), trigger AI immediately
         if (game.mode === 'ai' && game.humanColor === 2) {
           triggerAITurn();
         }
@@ -2007,7 +2231,18 @@
         game.rule = config.rule;
         game.names[1] = config.blackName;
         game.names[2] = config.whiteName;
-        net.myColor = (net.role === 'host') ? config.hostColor : (config.hostColor === 1 ? 2 : 1);
+        net.hostColor = config.hostColor;
+        net.matchActive = true;
+        if (typeof config.spectatorCount === 'number') {
+          net.spectatorCount = config.spectatorCount;
+        }
+        if (net.role === 'host') {
+          net.myColor = config.hostColor;
+        } else if (net.role === 'guest') {
+          net.myColor = config.hostColor === 1 ? 2 : 1;
+        } else {
+          net.myColor = 0; // spectator
+        }
         net.myRematch = false;
         net.oppRematch = false;
         game.started = true;
@@ -2019,76 +2254,247 @@
         document.getElementById('rematch-status-text').classList.add('hidden');
         updateHUD();
 
+        const subMsg = isSpectator()
+          ? `👀 관전 중 · ${game.names[1]}(흑) 선공으로 시작합니다!`
+          : net.myColor === 1
+          ? '🎯 내 차례 (흑 선공)입니다!'
+          : `⏳ ${game.names[1]}님(흑) 선공입니다!`;
+        showToast(`${game.names[1]} vs ${game.names[2]}`, subMsg, 'info', 1800);
+      }
+
+      function applySpectatorMidGameSync(st) {
+        game.mode = 'online';
+        game.started = Boolean(st.started);
+        net.matchActive = Boolean(st.matchActive);
+        game.rule = st.rule || 'renju';
+        game.turn = st.turn || 1;
+        game.over = Boolean(st.over);
+        game.winnerColor = st.winnerColor;
+        game.winCells = st.winCells || null;
+        game.names = { 1: (st.names && st.names[1]) || '흑', 2: (st.names && st.names[2]) || '백' };
+        net.spectatorCount = st.spectatorCount || 1;
+
+        resetStoneMeshGrid();
+        game.board = Array.from({ length: BOARD_N }, (_, r) =>
+          st.board && st.board[r] ? st.board[r].slice() : Array(BOARD_N).fill(0)
+        );
+        game.history = Array.isArray(st.history) ? st.history.slice() : [];
+
+        // Rebuild all placed stones instantaneously in 3D
+        if (threeReady) {
+          for (let r = 0; r < BOARD_N; r++) {
+            for (let c = 0; c < BOARD_N; c++) {
+              if (game.board[r][c] !== 0) {
+                addStoneMesh(r, c, game.board[r][c], true);
+              }
+            }
+          }
+          if (game.history.length > 0) {
+            const last = game.history[game.history.length - 1];
+            const { x, z } = gridToWorld(last.r, last.c);
+            lastMoveMarker.position.set(x, 0.405, z);
+            lastMoveMarker.visible = true;
+          } else {
+            lastMoveMarker.visible = false;
+          }
+          if (game.winCells) {
+            highlightWinningStones(game.winCells);
+          }
+        }
+
+        if (Array.isArray(st.chatHistory)) {
+          chatState.messages = st.chatHistory.slice(-MAX_CHAT_MESSAGES);
+          renderChatMessages();
+        }
+
+        hideModal(elStartModal);
+        hideModal(elResultModal);
+        hideModal(elDisconnectModal);
+        updateHUD();
+
         showToast(
-          `${game.names[1]} vs ${game.names[2]}`,
-          net.myColor === 1 ? '🎯 내 차례 (흑 선공)입니다!' : `⏳ ${game.names[1]}님(흑) 선공입니다!`,
+          '👀 관전 입장 완료!',
+          net.matchActive
+            ? (game.over ? '방금 대국이 종료되었습니다' : `${game.names[game.turn]}님 차례를 실시간으로 관전합니다`)
+            : '도전자 입장을 기다리고 있습니다',
           'info',
           1800
         );
+
+        if (game.over && game.winnerColor !== null) {
+          setTimeout(() => showResultModal(game.winnerColor), 600);
+        }
       }
 
-      function setupPeerConnection(conn) {
+      function hostSystemChat(text) {
+        const sysMsg = { system: true, text };
+        appendChatMessage(sysMsg, false);
+        broadcastFromHost({ type: 'chat', system: true, text });
+      }
+
+      function handleHostIncomingConnection(conn) {
+        conn.on('data', (data) => {
+          if (!data || typeof data !== 'object') return;
+
+          if (data.type === 'hello') {
+            const joinName = (data.name || '').trim() || (data.role === 'spectator' ? '관전자' : '도전자');
+            if (data.role === 'guest') {
+              if (net.guestConn && net.guestConn.open) {
+                conn.send({ type: 'room_full', reason: '이미 도전자 자리가 찼습니다. 관전하기로 입장해 보세요!' });
+                setTimeout(() => { try { conn.close(); } catch (e) {} }, 250);
+                return;
+              }
+              net.guestConn = conn;
+              const matchConfig = {
+                type: 'start_match',
+                rule: game.rule,
+                hostColor: 1,
+                blackName: net.myName,
+                whiteName: joinName,
+                spectatorCount: net.spectatorCount
+              };
+              broadcastFromHost(matchConfig);
+              startOnlineMatch(matchConfig);
+              hostSystemChat(`[도전자] ${joinName}님이 대국에 입장했습니다!`);
+            } else if (data.role === 'spectator') {
+              if (net.spectators.length >= MAX_SPECTATORS) {
+                conn.send({ type: 'room_full', reason: `관전 정원(${MAX_SPECTATORS}명)이 가득 찼습니다.` });
+                setTimeout(() => { try { conn.close(); } catch (e) {} }, 250);
+                return;
+              }
+              net.spectators.push({ conn, name: joinName });
+              net.spectatorCount = net.spectators.length;
+              conn.send({ type: 'spectator_sync', state: buildFullSyncState() });
+              broadcastFromHost({ type: 'spectator_count', count: net.spectatorCount });
+              updateHUD();
+              hostSystemChat(`[관전] ${joinName}님이 관전을 시작했습니다. (👀 ${net.spectatorCount}명)`);
+            }
+            return;
+          }
+
+          handleNetPacket(data, conn);
+        });
+
+        const onPeerDisconnect = () => {
+          if (conn === net.guestConn) {
+            net.guestConn = null;
+            if (net.matchActive) {
+              net.matchActive = false;
+              broadcastFromHost({ type: 'guest_left', reason: '도전자가 대국에서 나갔습니다.' });
+              updateHUD();
+              document.getElementById('disconnect-reason').textContent = '도전자가 대국에서 나갔습니다.';
+              showModal(elDisconnectModal);
+            }
+          } else {
+            const idx = net.spectators.findIndex((s) => s.conn === conn);
+            if (idx >= 0) {
+              const leftName = net.spectators[idx].name;
+              net.spectators.splice(idx, 1);
+              net.spectatorCount = net.spectators.length;
+              broadcastFromHost({ type: 'spectator_count', count: net.spectatorCount });
+              updateHUD();
+              hostSystemChat(`[관전] ${leftName}님이 퇴장했습니다. (👀 ${net.spectatorCount}명)`);
+            }
+          }
+        };
+
+        conn.on('close', onPeerDisconnect);
+        conn.on('error', onPeerDisconnect);
+      }
+
+      function setupClientConnection(conn, role) {
         net.conn = conn;
 
         conn.on('open', () => {
           net.connected = true;
-          if (net.role === 'guest') {
-            const myNick = (document.getElementById('online-nick-input').value || '').trim() || '게스트';
-            conn.send({ type: 'join', name: myNick });
+          conn.send({ type: 'hello', role, name: net.myName });
+          if (role === 'guest') {
             document.getElementById('join-status-text').textContent = '✅ 연결 완료! 대국을 시작합니다...';
+          } else {
+            document.getElementById('spec-status-text').textContent = '✅ 방에 연결되었습니다! 바둑판을 동기화합니다...';
           }
         });
 
         conn.on('data', (data) => {
           if (!data || typeof data !== 'object') return;
-          handleNetPacket(data);
+          handleNetPacket(data, conn);
         });
 
         const handleDrop = (reason) => {
-          if (!net.connected && !game.started) return;
+          if (!net.connected) return;
           net.connected = false;
+          net.matchActive = false;
           updateHUD();
-          if (game.mode === 'online' && game.started) {
-            document.getElementById('disconnect-reason').textContent = reason;
+          if (game.mode === 'online') {
+            document.getElementById('disconnect-reason').textContent = reason || '방장과의 연결이 끊어졌습니다.';
             showModal(elDisconnectModal);
           }
         };
 
-        conn.on('close', () => handleDrop('상대방이 대국에서 나갔습니다.'));
+        conn.on('close', () => handleDrop('방장이 방을 닫았거나 연결이 끊어졌습니다.'));
         conn.on('error', () => handleDrop('네트워크 연결 오류가 발생했습니다.'));
       }
 
-      function handleNetPacket(data) {
+      function handleNetPacket(data, senderConn = null) {
         switch (data.type) {
-          case 'join': {
-            if (net.role !== 'host') return;
-            const hostNick = (document.getElementById('online-nick-input').value || '').trim() || '호스트';
-            const guestNick = (data.name || '').trim() || '게스트';
-            const matchConfig = {
-              type: 'start_match',
-              rule: game.rule,
-              hostColor: 1,
-              blackName: hostNick,
-              whiteName: guestNick
-            };
-            sendNet(matchConfig);
-            startOnlineMatch(matchConfig);
+          case 'room_full': {
+            const msg = data.reason || '방에 입장할 수 없습니다.';
+            if (net.role === 'guest') document.getElementById('join-status-text').textContent = `❌ ${msg}`;
+            if (net.role === 'spectator') document.getElementById('spec-status-text').textContent = `❌ ${msg}`;
+            cleanupNetwork();
             break;
           }
           case 'start_match': {
             startOnlineMatch(data);
             break;
           }
+          case 'spectator_sync': {
+            applySpectatorMidGameSync(data.state);
+            break;
+          }
+          case 'spectator_count': {
+            net.spectatorCount = data.count || 0;
+            updateHUD();
+            break;
+          }
+          case 'guest_left': {
+            net.matchActive = false;
+            updateHUD();
+            document.getElementById('disconnect-reason').textContent = data.reason || '도전자가 대국에서 나갔습니다.';
+            showModal(elDisconnectModal);
+            break;
+          }
           case 'move': {
             if (data.color !== game.turn) return;
+            // If host receives guest's move, relay to all spectators
+            if (net.role === 'host' && senderConn === net.guestConn) {
+              broadcastFromHost(data, senderConn);
+            }
             placeStone(data.r, data.c, data.color, true);
             break;
           }
           case 'emoji': {
-            spawnFloatingEmoji(data.emoji, data.sender || '상대방');
+            if (net.role === 'host' && senderConn) {
+              broadcastFromHost(data, senderConn);
+            }
+            spawnFloatingEmoji(data.emoji, data.sender || '참가자');
+            break;
+          }
+          case 'chat': {
+            if (net.role === 'host' && senderConn) {
+              broadcastFromHost(data, senderConn);
+            }
+            appendChatMessage({
+              system: Boolean(data.system),
+              roleTag: data.roleTag || '관전',
+              sender: data.sender || '익명',
+              text: data.text || '',
+              isSelf: false
+            }, !data.system);
             break;
           }
           case 'rematch_request': {
+            if (isSpectator()) return;
             net.oppRematch = true;
             const statusEl = document.getElementById('rematch-status-text');
             if (net.myRematch) {
@@ -2103,8 +2509,7 @@
       }
 
       function triggerOnlineRematch() {
-        // Swap Black and White on rematch for fairness
-        const nextHostColor = net.myColor === 1 ? 2 : 1;
+        const nextHostColor = net.hostColor === 1 ? 2 : 1;
         const prevBlack = game.names[1];
         const prevWhite = game.names[2];
         const matchConfig = {
@@ -2112,10 +2517,12 @@
           rule: game.rule,
           hostColor: nextHostColor,
           blackName: prevWhite,
-          whiteName: prevBlack
+          whiteName: prevBlack,
+          spectatorCount: net.spectatorCount
         };
-        sendNet(matchConfig);
+        broadcastFromHost(matchConfig);
         startOnlineMatch(matchConfig);
+        hostSystemChat(`🔄 흑·백 교대 재대결 시작! (흑: ${matchConfig.blackName} / 백: ${matchConfig.whiteName})`);
       }
 
       function createOnlineRoom() {
@@ -2124,11 +2531,19 @@
           return;
         }
         cleanupNetwork();
+        resetChat();
         const code = String(Math.floor(1000 + Math.random() * 9000));
         net.role = 'host';
         net.roomCode = code;
+        net.myName = (document.getElementById('online-nick-input').value || '').trim() || '방장';
+        net.hostColor = 1;
+        net.myColor = 1;
+
+        game.names[1] = net.myName;
+        game.names[2] = '대기 중...';
 
         document.getElementById('host-before-create').classList.add('hidden');
+        document.getElementById('rule-setup-box').classList.add('hidden');
         document.getElementById('host-waiting-box').classList.remove('hidden');
         document.getElementById('room-code-display').textContent = code;
         document.getElementById('host-status-text').textContent = '🔌 서버에 방 등록 중...';
@@ -2136,14 +2551,13 @@
         try {
           const peer = new Peer(PEER_PREFIX + code, PEER_CONFIG);
           net.peer = peer;
-
           peer.on('open', () => {
-            document.getElementById('host-status-text').textContent = '⏳ 상대방 입장을 기다리는 중...';
+            net.connected = true;
+            document.getElementById('host-status-text').textContent = '⏳ 도전자 입장을 기다리는 중... (관전자도 지금 입장 가능)';
+            updateHUD();
           });
           peer.on('connection', (conn) => {
-            if (net.conn && net.conn.open) { conn.close(); return; }
-            document.getElementById('host-status-text').textContent = '✅ 상대방 연결 중...';
-            setupPeerConnection(conn);
+            handleHostIncomingConnection(conn);
           });
           peer.on('error', (err) => {
             document.getElementById('host-status-text').textContent =
@@ -2156,20 +2570,26 @@
         }
       }
 
-      function joinOnlineRoom() {
-        const statusEl = document.getElementById('join-status-text');
+      function connectToOnlineRoom(role) {
+        const isSpec = role === 'spectator';
+        const statusEl = document.getElementById(isSpec ? 'spec-status-text' : 'join-status-text');
+        const inputEl = document.getElementById(isSpec ? 'spec-code-input' : 'join-code-input');
+
         if (typeof Peer === 'undefined') {
           statusEl.textContent = '❌ 네트워크 모듈(PeerJS)을 불러올 수 없습니다.';
           return;
         }
-        const code = (document.getElementById('join-code-input').value || '').replace(/\D/g, '');
+        const code = (inputEl.value || '').replace(/\D/g, '');
         if (code.length !== 4) {
-          statusEl.textContent = '⚠️ 4자리 숫자 방 코드를 입력해 주세요.';
+          statusEl.textContent = '⚠️ 4자리 숫자 방 번호를 입력해 주세요.';
           return;
         }
         cleanupNetwork();
-        net.role = 'guest';
+        resetChat();
+        net.role = role;
+        net.myColor = isSpec ? 0 : 2;
         net.roomCode = code;
+        net.myName = (document.getElementById('online-nick-input').value || '').trim() || (isSpec ? '관전자' : '도전자');
         statusEl.textContent = `🔌 방 ${code}에 연결 중...`;
 
         try {
@@ -2177,11 +2597,11 @@
           net.peer = peer;
           peer.on('open', () => {
             const conn = peer.connect(PEER_PREFIX + code, { reliable: true });
-            setupPeerConnection(conn);
+            setupClientConnection(conn, role);
           });
           peer.on('error', (err) => {
             statusEl.textContent = err && err.type === 'peer-unavailable'
-              ? '❌ 해당 방 코드를 찾을 수 없습니다. 코드를 확인해 주세요.'
+              ? '❌ 해당 방 번호를 찾을 수 없습니다. 번호를 다시 확인해 주세요.'
               : '❌ 연결에 실패했습니다. 잠시 후 다시 시도해 주세요.';
           });
         } catch (err) {
@@ -2204,28 +2624,36 @@
 
         const tabHost = document.getElementById('online-tab-host');
         const tabJoin = document.getElementById('online-tab-join');
+        const tabSpec = document.getElementById('online-tab-spectate');
         const hostPanel = document.getElementById('online-host-panel');
         const joinPanel = document.getElementById('online-join-panel');
+        const specPanel = document.getElementById('online-spectate-panel');
 
         let onlineSubTab = 'host';
         function setOnlineSubTab(tab) {
           onlineSubTab = tab;
+          const inactive = 'py-1.5 rounded-lg text-[11px] sm:text-xs font-bold text-amber-100/80 hover:bg-white/10 transition cursor-pointer';
+          tabHost.className = tab === 'host'
+            ? 'py-1.5 rounded-lg text-[11px] sm:text-xs font-bold bg-emerald-500 text-stone-950 transition cursor-pointer' : inactive;
+          tabJoin.className = tab === 'join'
+            ? 'py-1.5 rounded-lg text-[11px] sm:text-xs font-bold bg-emerald-500 text-stone-950 transition cursor-pointer' : inactive;
+          tabSpec.className = tab === 'spectate'
+            ? 'py-1.5 rounded-lg text-[11px] sm:text-xs font-bold bg-purple-400 text-stone-950 transition cursor-pointer' : inactive;
+
+          hostPanel.classList.toggle('hidden', tab !== 'host');
+          joinPanel.classList.toggle('hidden', tab !== 'join');
+          specPanel.classList.toggle('hidden', tab !== 'spectate');
+
           if (tab === 'host') {
-            tabHost.className = 'py-1.5 rounded-lg text-xs font-bold bg-emerald-500 text-stone-950 transition cursor-pointer';
-            tabJoin.className = 'py-1.5 rounded-lg text-xs font-bold text-amber-100/80 hover:bg-white/10 transition cursor-pointer';
-            hostPanel.classList.remove('hidden');
-            joinPanel.classList.add('hidden');
-            ruleBox.classList.remove('hidden');
+            const isWaiting = !document.getElementById('host-waiting-box').classList.contains('hidden');
+            ruleBox.classList.toggle('hidden', isWaiting);
           } else {
-            tabJoin.className = 'py-1.5 rounded-lg text-xs font-bold bg-emerald-500 text-stone-950 transition cursor-pointer';
-            tabHost.className = 'py-1.5 rounded-lg text-xs font-bold text-amber-100/80 hover:bg-white/10 transition cursor-pointer';
-            joinPanel.classList.remove('hidden');
-            hostPanel.classList.add('hidden');
             ruleBox.classList.add('hidden');
           }
         }
         tabHost.addEventListener('click', () => setOnlineSubTab('host'));
         tabJoin.addEventListener('click', () => setOnlineSubTab('join'));
+        tabSpec.addEventListener('click', () => setOnlineSubTab('spectate'));
 
         function setModeUI(mode) {
           game.mode = mode;
@@ -2311,21 +2739,67 @@
           cleanupNetwork();
           document.getElementById('host-waiting-box').classList.add('hidden');
           document.getElementById('host-before-create').classList.remove('hidden');
+          ruleBox.classList.remove('hidden');
+          updateHUD();
         });
         document.getElementById('copy-code-btn').addEventListener('click', () => {
           if (copyToClipboard(net.roomCode)) {
-            showToast('방 코드 복사 완료!', `코드: ${net.roomCode}`, 'success', 1200);
+            showToast('방 번호 복사 완료!', `코드: ${net.roomCode}`, 'success', 1200);
           }
         });
         document.getElementById('copy-link-btn').addEventListener('click', () => {
           const inviteUrl = `${window.location.origin}${window.location.pathname}?room=${net.roomCode}`;
           if (copyToClipboard(inviteUrl)) {
-            showToast('초대 링크 복사 완료!', '카카오톡이나 문자로 붙여넣어 초대하세요', 'success', 1500);
+            showToast('대결 초대 링크 복사 완료!', '카카오톡이나 문자로 붙여넣어 초대하세요', 'success', 1500);
+          }
+        });
+        document.getElementById('copy-spec-link-btn').addEventListener('click', () => {
+          const specUrl = `${window.location.origin}${window.location.pathname}?room=${net.roomCode}&spectate=1`;
+          if (copyToClipboard(specUrl)) {
+            showToast('관전 링크 복사 완료!', '링크를 누르면 바로 관전 모드로 입장합니다', 'success', 1600);
           }
         });
         document.getElementById('join-room-btn').addEventListener('click', () => {
           sound.ensureContext();
-          joinOnlineRoom();
+          connectToOnlineRoom('guest');
+        });
+        document.getElementById('spectate-room-btn').addEventListener('click', () => {
+          sound.ensureContext();
+          connectToOnlineRoom('spectator');
+        });
+
+        // Real-time Chat Controls
+        const chatInput = document.getElementById('chat-input');
+        function submitChat() {
+          if (game.mode !== 'online' || !net.connected) return;
+          const text = (chatInput.value || '').trim();
+          if (!text) return;
+          chatInput.value = '';
+          const payload = {
+            type: 'chat',
+            roleTag: myRoleTag(),
+            sender: net.myName,
+            text
+          };
+          appendChatMessage({ ...payload, isSelf: true }, false);
+          sendNet(payload);
+        }
+        document.getElementById('chat-send-btn').addEventListener('click', submitChat);
+        chatInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            submitChat();
+          }
+        });
+        document.getElementById('chat-minimize-btn').addEventListener('click', () => {
+          chatState.isOpen = false;
+          updateChatPanelVisibility();
+        });
+        document.getElementById('chat-toggle-btn').addEventListener('click', () => {
+          chatState.isOpen = true;
+          chatState.unread = 0;
+          updateChatPanelVisibility();
+          renderChatMessages();
         });
 
         // Floating Confirm Bar Buttons
@@ -2337,7 +2811,7 @@
         });
         document.getElementById('cancel-preview-btn').addEventListener('click', hideConfirmBar);
 
-        // Top-Right Utility Controls
+        // Top-Right Utility Controls (View & Zoom work for Spectators too!)
         document.getElementById('view-toggle-btn').addEventListener('click', () => {
           if (camCtrl.viewMode === '3d') {
             camCtrl.viewMode = '2d';
@@ -2359,6 +2833,7 @@
         });
 
         document.getElementById('confirm-toggle-btn').addEventListener('click', () => {
+          if (isSpectator()) return;
           game.confirmMode = !game.confirmMode;
           if (!game.confirmMode) hideConfirmBar();
           updateHUD();
@@ -2373,25 +2848,25 @@
         });
 
         document.getElementById('new-game-btn').addEventListener('click', () => {
-          const canResume = game.started && !game.over;
+          const canResume = (game.started || isSpectator()) && !game.over;
           document.getElementById('cancel-settings-btn').classList.toggle('hidden', !canResume);
           showModal(elStartModal);
         });
 
-        // Emoji Reaction Buttons
+        // 5 Emoji Reaction Buttons (👏 🔥 😂 😱 🎉)
         document.querySelectorAll('.emoji-btn').forEach((btn) => {
           btn.addEventListener('click', () => {
             if (game.mode !== 'online' || !net.connected) return;
             const emoji = btn.dataset.emoji;
-            const myName = game.names[net.myColor] || '나';
-            spawnFloatingEmoji(emoji, myName);
-            sendNet({ type: 'emoji', emoji, sender: myName });
+            const senderLabel = `[${myRoleTag()}] ${net.myName}`;
+            spawnFloatingEmoji(emoji, senderLabel);
+            sendNet({ type: 'emoji', emoji, sender: senderLabel });
           });
         });
 
         // Result Modal Buttons
         document.getElementById('rematch-btn').addEventListener('click', () => {
-          if (game.mode === 'online' && net.connected) {
+          if (game.mode === 'online' && net.connected && !isSpectator()) {
             net.myRematch = true;
             sendNet({ type: 'rematch_request' });
             if (net.oppRematch) {
@@ -2407,30 +2882,47 @@
         });
 
         document.getElementById('result-menu-btn').addEventListener('click', () => {
+          if (game.mode === 'online') {
+            cleanupNetwork();
+            resetChat();
+          }
           hideModal(elResultModal);
+          document.getElementById('host-waiting-box').classList.add('hidden');
+          document.getElementById('host-before-create').classList.remove('hidden');
           document.getElementById('cancel-settings-btn').classList.add('hidden');
           showModal(elStartModal);
+          updateHUD();
         });
 
         // Disconnect Modal Return
         document.getElementById('disconnect-menu-btn').addEventListener('click', () => {
           cleanupNetwork();
+          resetChat();
           game.started = false;
           hideModal(elDisconnectModal);
           document.getElementById('host-waiting-box').classList.add('hidden');
           document.getElementById('host-before-create').classList.remove('hidden');
           document.getElementById('cancel-settings-btn').classList.add('hidden');
           showModal(elStartModal);
+          updateHUD();
         });
 
-        // Auto-detect ?room=XXXX URL parameter on load
+        // Auto-detect ?room=XXXX and optional &spectate=1 URL parameters
         try {
-          const urlRoom = new URLSearchParams(window.location.search).get('room');
+          const params = new URLSearchParams(window.location.search);
+          const urlRoom = params.get('room');
+          const isSpecParam = params.get('spectate') === '1';
           if (urlRoom && /^\d{4}$/.test(urlRoom)) {
             setModeUI('online');
-            setOnlineSubTab('join');
-            document.getElementById('join-code-input').value = urlRoom;
-            document.getElementById('join-status-text').textContent = `🔗 초대 링크(${urlRoom})로 접속했습니다! 입장하기를 눌러주세요.`;
+            if (isSpecParam) {
+              setOnlineSubTab('spectate');
+              document.getElementById('spec-code-input').value = urlRoom;
+              document.getElementById('spec-status-text').textContent = `👀 관전 링크(${urlRoom})로 접속했습니다! 관전 입장하기를 눌러주세요.`;
+            } else {
+              setOnlineSubTab('join');
+              document.getElementById('join-code-input').value = urlRoom;
+              document.getElementById('join-status-text').textContent = `🔗 초대 링크(${urlRoom})로 접속했습니다! 대국 입장하기를 눌러주세요.`;
+            }
           }
         } catch (e) {}
       }
